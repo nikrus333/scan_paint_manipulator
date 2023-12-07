@@ -1,0 +1,11 @@
+geometry_msgs/PoseArray[] poses_array
+float64 velocity
+float64 acceleration
+float64 rotational_velocity
+float64 rotational_acceleration
+string type_traject
+---
+bool success
+---
+float64[] robot_state
+bool status  

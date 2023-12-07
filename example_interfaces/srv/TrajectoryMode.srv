@@ -1,0 +1,5 @@
+int32 mode_work 
+int32 choose_start_manip
+---
+bool success
+string message
