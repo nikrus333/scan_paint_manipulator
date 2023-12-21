@@ -1,7 +1,7 @@
 #include "DxlMaster.h"
 
-#define openValue    650
-#define closeValue   495
+#define openValue    530
+#define closeValue   515
 
 #define baud_serial  115200
 
@@ -18,6 +18,7 @@ const int delay_timer = 100;
 int currentValue = 0;
 bool state = false;
 int steps = 0;
+String command = "";
 
 void setup() {
   currentValue = closeValue;
@@ -34,23 +35,36 @@ void setup() {
 }
 
 void loop() {
-  if (Serial.available()) {
-    String command = Serial.readString();
-    command.trim(); //remove \r\n
-    if (command == "On" || command == "on") {
+  String receivedData = readSerialString();
+  if (receivedData != "") {
+    command = receivedData;
+    if (command == "n") {
       digitalWrite(LED_BUILTIN, HIGH);
       if (!state) motor1.goalPosition(openValue);
       Serial.println("Open");
       state = true;
     }
-    if (command == "Off" || command == "off") {
+    if (command == "f") {
       digitalWrite(LED_BUILTIN, LOW);
       if (state) motor1.goalPosition(closeValue);
       Serial.println("Close");
       state = false;
     }
-    if (command == "check" || command == "Check") {
+    if (command == "c") {
       Serial.println("Ready");
     }
   }
+  command = "";
+}
+
+String readSerialString() {
+  String serialString = "";
+  while (Serial.available()) {
+    char c = Serial.read();
+    // Игнорируем символы новой строки и возврата каретки
+    if (c != '\n' && c != '\r') {
+      serialString += c;
+    }
+  }
+  return serialString;
 }
