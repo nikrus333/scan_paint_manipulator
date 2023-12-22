@@ -8,11 +8,11 @@ from paint_lidar.lidar_utils.closeOpenNozzle import closeOpen
 class MinimalService(Node):
     def __init__(self):
         super().__init__('server_open_close')
-        self.srv = self.create_service(OpenClose, 'service_open', self.status_callback)
-        self.serial = closeOpen(port='/dev/ttyNozzle', baudrate=115200)
-        # self.serial = closeOpen(port='/dev/ttyACM1', baudrate=115200)
+        self.srv = self.create_service(OpenClose, 'service_nozzle', self.status_callback)
+        self.serial = closeOpen(port='/dev/ttyUSB0', baudrate=115200)
 
-    def status_callback(self, request, response):
+    def status_callback(self, request: OpenClose.Request) -> OpenClose.Response:
+        response = OpenClose.Response()
         if self.serial.serial_is_open:
             if (request.status):
                 self.serial.open()

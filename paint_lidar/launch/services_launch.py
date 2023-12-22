@@ -7,7 +7,7 @@ def generate_launch_description():
 
         Node(
             package='paint_lidar',
-            executable='service_opening',
+            executable='service_nozzle',
             name='nozzle'
         ),
         Node(

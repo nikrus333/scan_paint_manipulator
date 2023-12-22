@@ -31,13 +31,13 @@ setup(
             'paint_wall = paint_lidar.paint_wall:main',
             'cliente = paint_lidar.servece_send:main',
             'nozzle_close_open = paint_lidar.nozzle_node:main',
-            'service_opening = paint_lidar.service_opening:main',
+            'service_nozzle = paint_lidar.service_nozzle:main',
             'client_opening = paint_lidar.client_opening:main',
-            #test
             'tf_pub = paint_lidar.tf_srv_pub:main',
             'fibonacci_action_service = paint_lidar.action_service:main',
             'service_trajectory = paint_lidar.service_trajectory:main',
-            'servece_send_new = paint_lidar.servece_send_new:main',
+            'menu = paint_lidar.menu:main',
+            'example_pcl2 = paint_lidar.example_pcl2:main',
         ],
     },
 )
