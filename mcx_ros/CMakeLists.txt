@@ -23,6 +23,7 @@ install(
   src/ros2api.py
   src/execute_trajectory_action.py
   src/laser_trajectory_action.py
+  src/test_paint_squad.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
