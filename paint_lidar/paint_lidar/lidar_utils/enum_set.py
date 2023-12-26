@@ -26,3 +26,9 @@ class ParametrsManipulator(Enum):
     MAX_DISTATION = 0.65
     TRANS_PLANE = 0.0
     DIST_PAINT = 0.75 + 0.30 
+
+
+class DevParametrs(Enum):
+    NOZZLE_DEV = '/dev/ttyUSB0'
+    SERVO_DEV = '/dev/ttyACM1'
+    LIDAR_DEV = '/dev/ttyACM0'

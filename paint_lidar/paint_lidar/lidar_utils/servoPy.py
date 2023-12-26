@@ -1,12 +1,12 @@
 import serial
 import time
+from .enum_set import DevParametrs
 
 class closeOpen:
     def __init__(self, simulation=False) -> None:
         self.simulation = simulation
         if not simulation:
-            self.SerialObj = serial.Serial(port="/dev/ttyServo", baudrate=115200)
-            # self.SerialObj = serial.Serial(port="/dev/ttyACM2", baudrate=115200)
+            self.SerialObj = serial.Serial(port=DevParametrs.SERVO_DEV.value, baudrate=115200)
             print("Waiting servo...")
             self.ckeckState()
             self.servo_open = False

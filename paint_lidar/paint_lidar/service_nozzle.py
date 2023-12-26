@@ -4,15 +4,14 @@ import time, serial
 
 from example_interfaces.srv import OpenClose
 from paint_lidar.lidar_utils.closeOpenNozzle import closeOpen
-
+from .lidar_utils.enum_set import DevParametrs
 class MinimalService(Node):
     def __init__(self):
         super().__init__('server_open_close')
         self.srv = self.create_service(OpenClose, 'service_nozzle', self.status_callback)
-        self.serial = closeOpen(port='/dev/ttyUSB0', baudrate=115200)
+        self.serial = closeOpen(port=DevParametrs.NOZZLE_DEV.value, baudrate=115200)
 
-    def status_callback(self, request: OpenClose.Request) -> OpenClose.Response:
-        response = OpenClose.Response()
+    def status_callback(self, request: OpenClose.Request, response: OpenClose.Response) -> OpenClose.Response:
         if self.serial.serial_is_open:
             if (request.status):
                 self.serial.open()

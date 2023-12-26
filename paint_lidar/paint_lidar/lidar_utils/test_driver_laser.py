@@ -14,14 +14,13 @@ import random
 from geometry_msgs.msg import Pose, PoseArray
 from collections.abc import Sequence
 
-
 from tf2_ros import TransformBroadcaster, Buffer, TransformListener
 from geometry_msgs.msg import TransformStamped, PointStamped, Quaternion, Pose, PoseStamped
 import tf2_geometry_msgs
 #import tf_transformations as transformations
 
 from .geometry_utils import GeometryMathMethods
-from .enum_set import ParametrsManipulator #
+from .enum_set import ParametrsManipulator, DevParametrs
 import rclpy
 from rclpy.node import Node
 
@@ -38,8 +37,7 @@ def deg2rad(degrees):
 class HokuyoManipulator():
     def __init__(self) -> None:
         print('import test_driver_laser')
-        # uart_port = '/dev/ttyACM0'
-        uart_port = '/dev/ttyLidar'
+        uart_port = DevParametrs.LIDAR_DEV.value
         uart_speed = 19200
         self.laser_serial = serial.Serial(port=uart_port, baudrate=uart_speed, timeout=0.5)
         self.port = serial_ports.SerialPort(self.laser_serial)
@@ -429,7 +427,7 @@ class PaintScanWall():
             z_arr.append(point[2])
         return x_arr, y_arr, z_arr
 
-    def  convert_srv_np(self, x_data, y_data, z_data):
+    def convert_srv_np(self, x_data, y_data, z_data):
         points = []
         for count in range(len(x_data)):
             point = [x_data[count], y_data[count], z_data[count]]
