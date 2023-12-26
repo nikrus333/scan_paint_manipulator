@@ -69,9 +69,9 @@ class TestPaintSquad(Node):
         
         if version == "new":
             self.robot = robot_command(self.req, self.motorcortex_types)
-        # if version == "old":
-        #     self.robot = robot_command_old(self.req, self.motorcortex_types)
-
+        if version == "old":
+            self.robot = robot_command_old(self.req, self.motorcortex_types)
+    
         if self.robot.engage():
             self.get_logger().info('Robot is at Engage')
         else:
