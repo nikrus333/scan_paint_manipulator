@@ -1,7 +1,7 @@
 import time
 from threading import Event
 
-from example_interfaces.srv import SetBool
+from example_interfaces.srv import SetPC2
 from example_interfaces.action import ExecuteTrajectoryArray
 
 
@@ -26,11 +26,10 @@ from threading import Event
 from ament_index_python.packages import get_package_share_directory
 from scipy.spatial.transform import Rotation as R
 
-from .lidar_utils import test_driver_laser
-from .lidar_utils import servoPy
-from .lidar_utils.enum_set import SelectModeWork
-
-
+from lidar_utils import test_driver_laser
+from lidar_utils import servoPy
+from lidar_utils.enum_set import SelectModeWork
+from lidar_utils.trajectory import euler_from_quaternion, quaternion_from_euler
 
 class ServiceFromService(Node):
 
@@ -45,7 +44,7 @@ class ServiceFromService(Node):
             self, ExecuteTrajectoryArray, 'execute_trajectory', callback_group=self.callback_group)
 
         self.srv = self.create_service(
-            SetBool,
+            SetPC2,
             '/point',
             self.add_two_ints_callback,
             callback_group=self.callback_group
@@ -72,7 +71,7 @@ class ServiceFromService(Node):
         self.points = np.array(self.points)
         self.paint = test_driver_laser.PaintScanWall()
 
-    def add_two_ints_callback(self, request, response):
+    def add_two_ints_callback(self, request: SetPC2.Request, response: SetPC2.Response) -> SetPC2.Response:
         debug = SelectModeWork.MANIPULATOR_SIMULATION.value
         mode = request.mode
         message = ' Сообщение Request received: мод работы ' + mode
@@ -85,47 +84,62 @@ class ServiceFromService(Node):
             event.set()
 
         if mode == 'scan':
+            pcd_list = []
             print('mode scan start')
-            self.scan_wall_flag = True
-            # response = scan_wall(response=response, debug=debug)
-            debug = SelectModeWork.MANIPULATOR_SIMULATION.value
-            if not debug:
-                future = self.send_goal(10)
-                # future = self.send_goal_rotate(10)
-                if not SelectModeWork.SERVO_LIDAR_SIMULATION.value:
-                    self.servo.open()
-            # self.robot.mission_scan()
-            try:
-                if not debug:
-                    while not self.status_manipulator:
-                        previous_t = time.time()
-
-            except KeyboardInterrupt:
-                print('End process scan')
-            finally:
-                if not SelectModeWork.SERVO_LIDAR_SIMULATION.value:
-                    self.servo.close()
-                pcd = self.pcd
-                if SelectModeWork.VISUALIZATION.value:
-                    o3d.visualization.draw_geometries([pcd])
-                #o3d.io.write_point_cloud('src/paint_river_volga/paint_lidar/scan_obj/scan_23_08.pcd', pcd) # save pcd data
-                if SelectModeWork.LIDAR_SIMULATION.value:
-                    pcd_new = o3d.io.read_point_cloud("src/paint_river_volga/paint_lidar/scan_obj/scan_23_08.pcd")
-                else:
-                    pcd_new = pcd
-                response.success = True
-                print('end scan')
-                numpy_arr = self.paint.PCDToNumpy(pcd_new)
-                response.x_data, response.y_data, response.z_data = self.paint.convert_np_srv(
-                    numpy_arr)
-                del pcd, self.pcd
-                self.pcd = o3d.geometry.PointCloud()
-        # *optionally* add initial points
-                self.points = []
-                self.points.append([0.0, 0.0, 1.0])
-                self.points = np.array(self.points)
+            pose_list = self.getPoints()
+            for i, pose_array in enumerate(pose_list):
+                print("step:", i)
                 self.status_manipulator = False
-                return response
+                self.scan_wall_flag = True
+                # response = scan_wall(response=response, debug=debug)
+                debug = SelectModeWork.MANIPULATOR_SIMULATION.value
+                if not debug:
+                    future = self.send_goal(pose_array)
+                    # future = self.send_goal_rotate(10)
+                    if not SelectModeWork.SERVO_LIDAR_SIMULATION.value:
+                        self.servo.open()
+                # self.robot.mission_scan()
+                try:
+                    if not debug:
+                        while not self.status_manipulator:
+                            previous_t = time.time()
+
+                except KeyboardInterrupt:
+                    print('End process scan')
+                finally:
+                    if not SelectModeWork.SERVO_LIDAR_SIMULATION.value:
+                        self.servo.close()
+                    pcd = self.pcd
+                    #o3d.io.write_point_cloud('src/paint_river_volga/paint_lidar/scan_obj/scan_23_08.pcd', pcd) # save pcd data
+                    if SelectModeWork.LIDAR_SIMULATION.value:
+                        pcd_new = o3d.io.read_point_cloud("/home/alex/ros2_scan/src/scan_paint_manipulator/paint_lidar/scan_obj/scan_23_08.pcd")
+                    else:
+                        pcd_new = pcd
+
+                    if SelectModeWork.VISUALIZATION.value:
+                        o3d.visualization.draw_geometries([pcd_new])
+                    
+                    pcd_list.append(pcd_new)
+                    del pcd, self.pcd
+                    self.pcd = o3d.geometry.PointCloud()
+                    print("End")
+            
+            print("here")
+            for i, pcd_ in enumerate(pcd_list):
+                print(i)
+                pc2 = self.paint.PCDToPC2(self, pcd_, "base_link")
+                response.pc2.append(pc2)
+            
+            print("success!")
+            response.success = True
+            #  numpy_arr = self.paint.PCDToNumpy(pcd_new)
+            # response.x_data, response.y_data, response.z_data = self.paint.convert_np_srv(numpy_arr)
+            # *optionally* add initial points
+            self.points = []
+            self.points.append([0.0, 0.0, 1.0])
+            self.points = np.array(self.points)
+            self.status_manipulator = False
+            return response
             
         if mode == 'calculate_range':
             self.scan_wall_flag = False
@@ -149,6 +163,31 @@ class ServiceFromService(Node):
                 response.success = True
                 return response
         return response
+
+    def getPoints(self) -> list[PoseArray]:
+        """Create array pose for N scanning points"""
+        point_list = []
+        for i in range(3):
+            line = PoseArray()
+            pose1 = Pose()
+            pose1.position.x = 0.640
+            pose1.position.y = -0.450 + i*0.450
+            pose1.position.z = 0.4
+            q = quaternion_from_euler(math.radians(180), math.radians(0), math.radians(90))
+            pose1.orientation.x = q[0]
+            pose1.orientation.y = q[1]
+            pose1.orientation.z = q[2]
+            pose1.orientation.w = q[3]
+            line.poses.append(pose1)
+
+            pose2 = Pose()
+            pose2.position.x = 0.540
+            pose2.position.y = -0.450 + i*0.450
+            pose2.position.z = 0.4
+            pose2.orientation = pose1.orientation
+            line.poses.append(pose2)
+            point_list.append(line)
+        return point_list
 
     def send_goal_rotate(self, order):
         pi = math.pi
@@ -201,46 +240,10 @@ class ServiceFromService(Node):
 
         self._send_goal_future.add_done_callback(self.goal_response_callback)
 
-
-    def send_goal(self, order):
+    def send_goal(self, pose_array: PoseArray):
         pi = math.pi
         goal_msg = ExecuteTrajectoryArray.Goal()
-        poses = []
-        pose_arr1 = PoseArray()
-        pose1 = Pose()
-        pose2 = Pose()
-
-        # pose1.position.x = 47/1000
-        # pose1.position.y = -406/1000
-        # pose1.position.z = 289/1000
-        # r1 = R.from_euler('zyx', [0 * pi / 180, 0 * pi / 180, 180 * pi / 180])
-        r1 = R.from_euler('zyx', [math.radians(
-            90), math.radians(0), math.radians(90)])
-        pose1.position.x = 0.640
-        pose1.position.y = -0.039
-        pose1.position.z = 0.6
-        x, y, z, w = r1.as_quat()
-
-        pose1.orientation.x = math.radians(90)
-        pose1.orientation.y = math.radians(0)
-        pose1.orientation.z = math.radians(90)
-        pose1.orientation.w = w
-
-        # pose2.position.x = 47/1000
-        # pose2.position.y = -592/1000
-        # pose2.position.z = 291/1000
-
-        pose2.position.x = 0.640
-        pose2.position.y = -0.039
-        pose2.position.z = 0.350
-
-        pose2.orientation.x = math.radians(90)
-        pose2.orientation.y = math.radians(0)
-        pose2.orientation.z = math.radians(90)
-        pose2.orientation.w = w
-        pose_arr1.poses = [pose1, pose2]
-
-        goal_msg.poses_array = [pose_arr1]
+        goal_msg.poses_array = [pose_array]
 
         goal_msg.acceleration = 0.02
         goal_msg.velocity = 0.008

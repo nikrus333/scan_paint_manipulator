@@ -12,6 +12,8 @@ from scipy.spatial.transform import Rotation as R
 import copy
 import random
 from geometry_msgs.msg import Pose, PoseArray
+from sensor_msgs.msg import PointCloud2, PointField
+from std_msgs.msg import Header
 from collections.abc import Sequence
 
 from tf2_ros import TransformBroadcaster, Buffer, TransformListener
@@ -22,6 +24,7 @@ import tf2_geometry_msgs
 from .geometry_utils import GeometryMathMethods
 from .enum_set import ParametrsManipulator, DevParametrs
 import rclpy
+import struct
 from rclpy.node import Node
 
 
@@ -245,6 +248,67 @@ class PaintScanWall():
         pcd = o3d.geometry.PointCloud()
         pcd.points = o3d.utility.Vector3dVector(xyz)
         return pcd
+    
+    def PCDToPC2(self, node: Node, pcd: o3d.geometry.PointCloud, frame_id: str) -> PointCloud2:
+        array = self.PCDToNumpy(pcd)
+        return self.NumpyToPC2(node, array, frame_id)
+    
+    def PC2ToPCD(self, pc2: PointCloud2) -> o3d.geometry.PointCloud:
+        array = self.PC2ToNumpy(pc2)
+        return self.NumpyToPCD(array)
+
+    def NumpyToPC2(self, node: Node, array_list: list[list[int]], frame_id: str) -> PointCloud2:
+        header = Header()
+        header.stamp = node.get_clock().now().to_msg()
+        header.frame_id = frame_id
+
+        point_cloud_msg = PointCloud2()
+        point_cloud_msg.header = header
+        point_cloud_msg.height = 1
+        point_cloud_msg.width = len(array_list)
+        point_cloud_msg.is_bigendian = False
+        point_cloud_msg.is_dense = True
+
+        point_field = PointField()
+        point_field.name = "x"
+        point_field.offset = 0
+        point_field.datatype = PointField.FLOAT32
+        point_field.count = 1
+        point_cloud_msg.fields.append(point_field)
+
+        point_field = PointField()
+        point_field.name = "y"
+        point_field.offset = 4
+        point_field.datatype = PointField.FLOAT32
+        point_field.count = 1
+        point_cloud_msg.fields.append(point_field)
+
+        point_field = PointField()
+        point_field.name = "z"
+        point_field.offset = 8
+        point_field.datatype = PointField.FLOAT32
+        point_field.count = 1
+        point_cloud_msg.fields.append(point_field)
+
+        point_cloud_msg.point_step = 12
+        point_cloud_msg.row_step = len(array_list) * point_cloud_msg.point_step
+        point_cloud_msg.data = []
+
+        for point in array_list:
+            point_cloud_msg.data.extend(struct.pack('fff', point[0], point[1], point[2]))
+
+        return point_cloud_msg
+    
+    def PC2ToNumpy(self, pointcloud2: PointCloud2) -> np.ndarray:
+        point_step = pointcloud2.point_step
+        data = pointcloud2.data
+        point_array = []
+        for i in range(0, len(data), point_step):
+            x = np.around(struct.unpack_from('f', data, i)[0], 8)
+            y = np.around(struct.unpack_from('f', data, i + 4)[0], 8)
+            z = np.around(struct.unpack_from('f', data, i + 8)[0], 8)
+            point_array.append([x, y, z])
+        return point_array
        
     def CreateTraectory_circle_vertical(self, pcd_list) -> None:
         def find_eig_frame(pcd):        

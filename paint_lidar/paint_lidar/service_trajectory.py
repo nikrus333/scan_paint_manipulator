@@ -21,7 +21,7 @@ from tf2_ros import TransformException
 from tf2_ros.transform_listener import TransformListener
 
 from example_interfaces.action import ExecuteTrajectoryArray
-from example_interfaces.srv import SetBool, SetAngle, PoseTf, TrajectoryMode
+from example_interfaces.srv import SetPC2, SetAngle, PoseTf, TrajectoryMode
 
 from .lidar_utils import test_driver_laser, trajectory
 from .lidar_utils.enum_set import ModeWork, ChooseStartManip, ParametrsManipulator, SelectModeWork
@@ -39,16 +39,21 @@ class ServiceTrajectory(Node):
         self.tf_listener1 = TransformListener(self.tf_buffer_1, self, spin_thread=True)
         self.callback_group = ReentrantCallbackGroup()
         self.srv = self.create_service(TrajectoryMode, '/service_trajectory', self.status_callback, callback_group=self.callback_group)
-        self.cli = self.create_client(SetBool, '/point', callback_group=self.callback_group)
+        self.cli = self.create_client(SetPC2, '/point', callback_group=self.callback_group)
         self.cli_pose_eig = self.create_client(SetAngle, '/arrow_points_service', callback_group=self.callback_group)
-        self._action_client = ActionClient(
-            self, ExecuteTrajectoryArray, 'execute_trajectory', callback_group=self.callback_group)
-        while not self.cli.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('service  POINT not available')
-        print("Yes points service")
-        while not self.cli_pose_eig.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('service  ARROW POINTS SERVICE not available')
-        print("Yes arrow service")
+        self._action_client = ActionClient(self, ExecuteTrajectoryArray, 'execute_trajectory', callback_group=self.callback_group)
+        attempted = 0
+        while not self._action_client.wait_for_server(timeout_sec=1.0):
+            self.get_logger().info('Action execute not available')
+            attempted += 1
+            if attempted >= 5:
+                print("Couldn`t to connect to execute_trajectory")
+                break
+
+        # print("Yes points service")
+        # while not self.cli_pose_eig.wait_for_service(timeout_sec=1.0):
+        #     self.get_logger().info('service  ARROW POINTS SERVICE not available')
+        # print("Yes arrow service")
 
         self.points = None
         self.angle = None
@@ -63,8 +68,8 @@ class ServiceTrajectory(Node):
 
         self.count_paint_make = 0
 
-    def send_request(self, mode_work):
-        req = SetBool.Request()
+    def send_request(self, mode_work: str) -> SetPC2.Response:
+        req = SetPC2.Request()
         match mode_work:
             case ModeWork.SCAN_AND_PAINT.value:
                 req.mode = 'scan'
@@ -532,56 +537,57 @@ class ServiceTrajectory(Node):
         match mode_work:
             case ModeWork.SCAN_AND_PAINT.value:
                 response_client = self.send_request(mode_work)
-                x_data, y_data, z_data = response_client.x_data, response_client.y_data, response_client.z_data
-                numpy_arr = paint.convert_srv_np(x_data, y_data, z_data)
-                print(numpy_arr)
-                pcd_new = paint.NumpyToPCD(numpy_arr)
+                # x_data, y_data, z_data = response_client.x_data, response_client.y_data, response_client.z_data
+                # numpy_arr = paint.convert_srv_np(x_data, y_data, z_data)
+                # print(numpy_arr)
+                # pcd_new = paint.NumpyToPCD(numpy_arr)
+                pcd_new = paint.PC2ToPCD(response_client.pc2[0])
                 pcd_new = pcd_new.transform(np.array([[1, 0, 0, ParametrsManipulator.TRANS_PLANE.value - ParametrsManipulator.DIST_PAINT.value],
                                                         [0, 1, 0, 0],
                                                         [0, 0, 1, 0],
                                                         [0, 0, 0, 1]]))
 
-                plane_list = paint.DetectMultiPlanes(
-                    pcd_new, min_ratio=0.15, threshold=0.017, iterations=1000)
+                # plane_list = paint.DetectMultiPlanes(
+                #     pcd_new, min_ratio=0.15, threshold=0.017, iterations=1000)
                 
-                if SelectModeWork.VISUALIZATION.value:
-                    paint.DrawPlanes(plane_list)
+                # if SelectModeWork.VISUALIZATION.value:
+                #     paint.DrawPlanes(plane_list)
 
-                if len(plane_list) > 1:
-                    plane_list = paint.select_plane(plane_list)
-                    # plane_list = [plane_list.pop(0)]
-                else:
-                    response.message += "Обнаружена одна поверхность\n"
+                # if len(plane_list) > 1:
+                #     plane_list = paint.select_plane(plane_list)
+                #     # plane_list = [plane_list.pop(0)]
+                # else:
+                #     response.message += "Обнаружена одна поверхность\n"
                 
-                if self.count_paint_make == 0:    
-                    self.array_slice, self.euler, self.rotation, self.trans, self.dist_point_to_plane, self.step = paint.CreateTraectory_circle_vertical(
-                        plane_list)
-                    response.message += f"Дистанция до поверхности: {self.dist_point_to_plane}\n"
-                    if (self.dist_point_to_plane < ParametrsManipulator.MIN_DISTATION.value
-                            or self.dist_point_to_plane > ParametrsManipulator.MAX_DISTATION.value):
+                # if self.count_paint_make == 0:    
+                #     self.array_slice, self.euler, self.rotation, self.trans, self.dist_point_to_plane, self.step = paint.CreateTraectory_circle_vertical(
+                #         plane_list)
+                #     response.message += f"Дистанция до поверхности: {self.dist_point_to_plane}\n"
+                #     if (self.dist_point_to_plane < ParametrsManipulator.MIN_DISTATION.value
+                #             or self.dist_point_to_plane > ParametrsManipulator.MAX_DISTATION.value):
 
-                        response.message += "Дистанция слишком мала/велика\n"
-                        response.message += "Передвиньте стрелу"
+                #         response.message += "Дистанция слишком мала/велика\n"
+                #         response.message += "Передвиньте стрелу"
 
-                    euler1 = paint.rot2euler(self.rotation)
-                    self.array_traject_msg = self.create_msg(
-                        self.array_slice, euler1)
+                #     euler1 = paint.rot2euler(self.rotation)
+                #     self.array_traject_msg = self.create_msg(
+                #         self.array_slice, euler1)
                     
-                    self.rotation, self.trans = self.rotation, self.trans
-                    transform_manipulator_eig = self.tf_eig(self.rotation, self.trans)
-                    global_tf_slice = self.tf_call_tool(array_slice=self.array_slice, euler=self.rotation)
-                    transform_world_manipulator = self.listener_tf()
-                    self.transform_eig_world = test_driver_laser.PaintScanWall.sum_tf_stemp(transform_world_manipulator, transform_manipulator_eig, 
-                                                                                    self.get_clock().now().to_msg())
-                    self.tf_eig_world(self.transform_eig_world)
-                    self.send_request_angle(self.transform_eig_world, self.step)
-                else:
-                    transform_manipulator_eig = self.tf_eig(self.rotation, self.trans)
-                    transform_world_manipulator = self.listener_tf()
-                    self.transform_eig_world = test_driver_laser.PaintScanWall.sum_tf_stemp(transform_world_manipulator, transform_manipulator_eig, 
-                                                                                    self.get_clock().now().to_msg())
-                    _0, _01, self.rotation, _02, _03, _04 = paint.CreateTraectory_circle_vertical(
-                        plane_list)
+                #     self.rotation, self.trans = self.rotation, self.trans
+                #     transform_manipulator_eig = self.tf_eig(self.rotation, self.trans)
+                #     global_tf_slice = self.tf_call_tool(array_slice=self.array_slice, euler=self.rotation)
+                #     transform_world_manipulator = self.listener_tf()
+                #     self.transform_eig_world = test_driver_laser.PaintScanWall.sum_tf_stemp(transform_world_manipulator, transform_manipulator_eig, 
+                #                                                                     self.get_clock().now().to_msg())
+                #     self.tf_eig_world(self.transform_eig_world)
+                #     self.send_request_angle(self.transform_eig_world, self.step)
+                # else:
+                #     transform_manipulator_eig = self.tf_eig(self.rotation, self.trans)
+                #     transform_world_manipulator = self.listener_tf()
+                #     self.transform_eig_world = test_driver_laser.PaintScanWall.sum_tf_stemp(transform_world_manipulator, transform_manipulator_eig, 
+                #                                                                     self.get_clock().now().to_msg())
+                #     _0, _01, self.rotation, _02, _03, _04 = paint.CreateTraectory_circle_vertical(
+                #         plane_list)
                 response.success = True
                 return response
                         

@@ -17,6 +17,8 @@ import time
 from libs.motion_program import Waypoint, MotionProgram, PoseTransformer
 from libs.robot_command import RobotCommand
 from libs.system_defs import InterpreterStates
+from paint_lidar.lidar_utils.trajectory import euler_from_quaternion, quaternion_from_euler
+
 # from robot_control.motion_program import Waypoint, MotionProgram, PoseTransformer
 # from robot_control.robot_command import RobotCommand
 # from robot_control.system_defs import InterpreterStates
@@ -34,10 +36,10 @@ class ExecuteTrajectoryAction(Node):
         # self.publisher_ = self.create_publisher(Bool, '/nozzle_close_open', 1)
 
         # /////////////////////////////////////////////
-        self._client_nozzle = self.create_client(OpenClose, "service_open")
+        self._client_nozzle = self.create_client(OpenClose, "service_nozzle")
 
         while not self._client_nozzle.wait_for_service(timeout_sec=1.0):
-            self.get_logger().info('service not available, waiting again...')
+            self.get_logger().info('Service_nozzle not available, waiting again...')
 
         self._req_open = OpenClose.Request()
         # /////////////////////////////////////////////
@@ -50,7 +52,7 @@ class ExecuteTrajectoryAction(Node):
             get_package_share_directory('mcx_ros'), 'license', 'mcx.cert.pem')
 
         try:
-            self.req, self.sub = motorcortex.connect('wss://192.168.201.129:5568:5567', self.motorcortex_types, parameter_tree,
+            self.req, self.sub = motorcortex.connect('wss://192.168.5.151:5568:5567', self.motorcortex_types, parameter_tree,
                                                      timeout_ms=1000, certificate=license_file,
                                                      login="admin", password="vectioneer")
             self.subscription = self.sub.subscribe(
@@ -128,11 +130,12 @@ class ExecuteTrajectoryAction(Node):
                 x = pose.position.x
                 y = pose.position.y
                 z = pose.position.z
-                r = R.from_quat(
-                    [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w])
-                psi, theta, phi = r.as_euler('zyx')
+                roll, pitch, yaw = euler_from_quaternion([pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w])
+                # r = R.from_quat(
+                #     [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w])
+                # psi, theta, phi = r.as_euler('zyx')
                 points.append(Waypoint(
-                    [x, y, z, pose.orientation.x, pose.orientation.y, pose.orientation.z]))
+                    [x, y, z, roll, pitch, yaw]))
 
             joint_params = self.joint_subscription.read()
             value = joint_params[0].value
