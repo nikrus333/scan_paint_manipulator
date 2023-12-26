@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 find_package(geometry_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
 project(example_interfaces)
 
 # Default to C++14
@@ -55,7 +56,8 @@ rosidl_generate_interfaces(${PROJECT_NAME}
   "srv/SetAngle.srv"
   "srv/PoseTf.srv"
   "srv/TrajectoryMode.srv"
-  DEPENDENCIES geometry_msgs
+  "srv/SetPC2.srv"  
+  DEPENDENCIES geometry_msgs sensor_msgs
 )
  
 install(FILES mapping_rules.yaml DESTINATION share/${PROJECT_NAME})
