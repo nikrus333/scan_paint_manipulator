@@ -2,7 +2,7 @@
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import Pose
+from geometry_msgs.msg import Pose, Point
 from example_interfaces.srv import OpenClose
 from rclpy.callback_groups import ReentrantCallbackGroup
 
@@ -11,7 +11,8 @@ import math
 import time
 
 from libs.motion_program import Waypoint, MotionProgram
-from libs.robot_command import RobotCommand
+from libs.robot_command import RobotCommand as robot_command
+from libs.robot_command_old import RobotCommand as robot_command_old
 from libs.system_defs import InterpreterStates
 
 from paint_lidar.lidar_utils.trajectory import euler_from_quaternion, quaternion_from_euler
@@ -19,6 +20,7 @@ import numpy as np
 from ament_index_python.packages import get_package_share_directory
 import os
 
+version = "new"
 
 class TestPaintSquad(Node):
 
@@ -26,20 +28,23 @@ class TestPaintSquad(Node):
         super().__init__('execute_trajectory_action')
 
         self.__lastMsg = None
-        self._vel = 0.08
-        self._acc = 0.25
+        self._vel = 0.05
+        self._acc = 0.4
         self._tool_leng = 0.185
-        self._dist_paint = 0.1
-        self._leadSize  = 0.02
+        self._dist_paint = 0.05
+        self._leadSize  = 0.01
+        self._offset = Point(x=.0, y=.0, z=-0.085)
 
         self.callback_group = ReentrantCallbackGroup()
         self._client_nozzle = self.create_client(OpenClose, "service_nozzle", callback_group=self.callback_group)
+        self._client_nozzle_connect = True
         attempted = 0
         while not self._client_nozzle.wait_for_service(timeout_sec=1.0):
             self.get_logger().info('Service nozzle execute not available')
             attempted += 1
             if attempted >= 5:
-                print("Couldn`t to connect to execute_trajectory")
+                print("Couldn`t to connect to service nozzle")
+                self._client_nozzle_connect = False
                 break
 
         parameter_tree = motorcortex.ParameterTree()
@@ -61,7 +66,11 @@ class TestPaintSquad(Node):
             self.get_logger().info(license_file)
             self.get_logger().info(f"Failed to establish connection: {e}")
             return
-        self.robot = RobotCommand(self.req, self.motorcortex_types)
+        
+        if version == "new":
+            self.robot = robot_command(self.req, self.motorcortex_types)
+        # if version == "old":
+        #     self.robot = robot_command_old(self.req, self.motorcortex_types)
 
         if self.robot.engage():
             self.get_logger().info('Robot is at Engage')
@@ -73,23 +82,24 @@ class TestPaintSquad(Node):
         self.run()
 
     def run(self):
+        input("Wait enter for move to point 🐢")
         self.MoveToStartPoint()
-        input("Wait enter for start 🐢")
+        input("Wait enter for start program 🐢")
         self.paintSquad()
         self.MoveToStartPoint()
         pass
     
     def paintSquad(self):
         pose = Pose()
-        pose.position.x = 0.700
-        pose.position.y = 0.0
-        pose.position.z = self._dist_paint + self._tool_leng
+        pose.position.x = 0.600 + self._offset.x
+        pose.position.y = 0.0 + self._offset.y
+        pose.position.z = self._dist_paint + self._tool_leng + self._offset.z
         q = quaternion_from_euler(math.radians(180), math.radians(0), math.radians(90))
         pose.orientation.x = q[0]
         pose.orientation.y = q[1]
         pose.orientation.z = q[2]
         pose.orientation.w = q[3]
-        array_list = self.createMatrixPaint(pose, 0.20, 0.20, self._leadSize)
+        array_list = self.createMatrixPaint(pose, width=0.15, height=0.10, leadSize=self._leadSize)
         print("array_list:", array_list)
         for i, line in enumerate(array_list):
             print("line:", i + 1)
@@ -119,6 +129,7 @@ class TestPaintSquad(Node):
         return array_list
 
     def send_request(self, status: bool) -> OpenClose.Response:
+        print(f"Send {status}")
         request = OpenClose.Request()
         request.status = status
         self.future = self._client_nozzle.call_async(request)
@@ -128,7 +139,7 @@ class TestPaintSquad(Node):
     def MoveToStartPoint(self):
         motion_program = MotionProgram(self.req, self.motorcortex_types)    
         point = []
-        x = 0.500
+        x = 0.600
         y = -0.0
         z = self._dist_paint + self._tool_leng + 0.1
         point.append(Waypoint([x, y, z, math.radians(90), math.radians(0), math.radians(180)]))
@@ -164,19 +175,28 @@ class TestPaintSquad(Node):
             else:
                 raise Exception('Failed to move to the start position')
         
-        print(True)
-        self.send_request(True)
+        # Nozzle on
+        if self._client_nozzle_connect:
+            self.send_request(True)
+        else:
+            print(True)
+
         self.robot.play()
         while self.robot.getState() is InterpreterStates.PROGRAM_IS_DONE.value:
             time.sleep(0.1)
             print('Waiting for the program to start, robot state: {}'.format(self.robot.getState()))
 
         while self.robot.getState() is InterpreterStates.PROGRAM_RUN_S.value:
-            params = self.subscription.read()
-            value = params[0].value
+            if version == "new":
+                params = self.subscription.read()
+                value = params[0].value
             time.sleep(0.01)
-        print(False)
-        self.send_request(False)
+        
+        # Nozzle off
+        if self._client_nozzle_connect:
+            self.send_request(False)
+        else:
+            print(False)
 
         self.robot.reset()
 
