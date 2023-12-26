@@ -32,6 +32,7 @@ install (
   libs/__init__.py
   libs/motion_program.py
   libs/robot_command.py
+  libs/robot_command_old.py
   libs/motionSL_pb2.py
   libs/system_defs.py
   libs/motionSL_hash.json
