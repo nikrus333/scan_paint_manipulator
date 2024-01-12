@@ -9,7 +9,7 @@ from rclpy.callback_groups import ReentrantCallbackGroup
 import motorcortex
 import math
 import time
-
+from math import sin, cos
 from libs.motion_program import Waypoint, MotionProgram
 from libs.robot_command import RobotCommand as robot_command
 from libs.robot_command_old import RobotCommand as robot_command_old
@@ -53,7 +53,7 @@ class TestPaintSquad(Node):
             get_package_share_directory('mcx_ros'), 'license', 'mcx.cert.pem')
 
         try:
-            self.req, self.sub = motorcortex.connect('wss://192.168.5.151:5568:5567', self.motorcortex_types, parameter_tree,
+            self.req, self.sub = motorcortex.connect('wss://192.168.2.100:5568:5567', self.motorcortex_types, parameter_tree,
                                                      timeout_ms=1000, certificate=license_file,
                                                      login="admin", password="vectioneer")
             self.subscription = self.sub.subscribe(
@@ -79,17 +79,106 @@ class TestPaintSquad(Node):
             return
         
         self.robot.reset()
-        self.run()
 
     def run(self):
-        input("Wait enter for move to point 🐢")
+        mode_work = self.chosseMission()
+        match mode_work:
+            case 1:
+                self.missionSquad()
+            case 2:
+                self.missionT()
+            case 3:
+                self.missionChess()
         self.MoveToStartPoint()
-        input("Wait enter for start program 🐢")
-        self.paintSquad()
-        self.MoveToStartPoint()
+    
+    def chosseMission(self) -> int:
+        while True:
+            print("Enter mission")
+            print("1 - Squad")
+            print('2 - Letter \"T\"')
+            print("3 - Chess")
+            chosse_start_manip = input()
+            if chosse_start_manip.isdigit():
+                chosse_start_manip = int(chosse_start_manip)
+            if (chosse_start_manip == 1) or (chosse_start_manip == 2) or (chosse_start_manip == 3):
+                return chosse_start_manip
+            else:
+                print('Некорректный ввод')
+    
+    def missionChess(self):
+        # Settings
+        width = 0.10
+        height = width
+        leadSize = self._leadSize
+        n = 3 # rows
+        m = 3 # colums
+        
+        for i in range(n):
+            for j in range(m):
+                print("i:", i, "j:", j)
+                if i % 2 == 1 and j % 2 == 0: continue
+                if i % 2 == 0 and j % 2 == 1: continue
+                pose = Pose()
+                pose.position.x = 0.800 + self._offset.x - height * i
+                pose.position.y = 0.0 + self._offset.y - width * j
+                pose.position.z = self._dist_paint + self._tool_leng + self._offset.z
+                q = quaternion_from_euler(math.radians(180), math.radians(0), math.radians(90))
+                pose.orientation.x = q[0]
+                pose.orientation.y = q[1]
+                pose.orientation.z = q[2]
+                pose.orientation.w = q[3]
+                array_list = self.createMatrixPaint(pose, width=width, height=height, leadSize=leadSize)
+                print("array_list:", array_list)
+                for k, line in enumerate(array_list):
+                    print("line:", k + 1)
+                    self.MovePoints(line, self._vel, self._acc, self.req, self.motorcortex_types)  
         pass
     
-    def paintSquad(self):
+    def missionT(self):
+        # Settings
+        height = self._leadSize * 2
+        width = 0.15
+        connect = True
+        # ------
+        pose = Pose()
+        pose.position.x = 0.7 + self._offset.x
+        pose.position.y = 0.0 + self._offset.y
+        pose.position.z = self._dist_paint + self._tool_leng + self._offset.z
+        q = quaternion_from_euler(math.radians(180), math.radians(0), math.radians(90))
+        pose.orientation.x = q[0]
+        pose.orientation.y = q[1]
+        pose.orientation.z = q[2]
+        pose.orientation.w = q[3]
+        array_list = self.createMatrixPaint(pose, width=width, height=height, leadSize=self._leadSize, flag=False)
+        print("len", len(array_list))
+        for i, line in enumerate(array_list):
+            print("line:", i + 1)
+            self.MovePoints(line, self._vel, self._acc, self.req, self.motorcortex_types)  
+
+        # |
+        pose = Pose()
+        pose.position.x = 0.7 + self._offset.x - (height if connect else 0)
+        pose.position.y = (-width-height)/2 + self._offset.y
+        pose.position.z = self._dist_paint + self._tool_leng + self._offset.z
+        q = quaternion_from_euler(math.radians(180), math.radians(0), math.radians(180))
+        pose.orientation.x = q[0]
+        pose.orientation.y = q[1]
+        pose.orientation.z = q[2]
+        pose.orientation.w = q[3]
+        array_list = self.createMatrixPaint(pose, width=width - (height if connect else 0), height=height, leadSize=self._leadSize, flag=True)
+        print("len", len(array_list))
+        print(array_list[0], array_list[1], array_list[2])
+        for i, line in enumerate(array_list):
+            print("line:", i + 1)
+            self.MovePoints(line, self._vel, self._acc, self.req, self.motorcortex_types)  
+        pass
+    
+    def missionSquad(self):
+        # Settings
+        width = 0.15
+        height = 0.15
+        leadSize = self._leadSize
+        
         pose = Pose()
         pose.position.x = 0.600 + self._offset.x
         pose.position.y = 0.0 + self._offset.y
@@ -99,14 +188,14 @@ class TestPaintSquad(Node):
         pose.orientation.y = q[1]
         pose.orientation.z = q[2]
         pose.orientation.w = q[3]
-        array_list = self.createMatrixPaint(pose, width=0.15, height=0.10, leadSize=self._leadSize)
+        array_list = self.createMatrixPaint(pose, width=width, height=height, leadSize=leadSize)
         print("array_list:", array_list)
         for i, line in enumerate(array_list):
             print("line:", i + 1)
             self.MovePoints(line, self._vel, self._acc, self.req, self.motorcortex_types)  
         pass
 
-    def createMatrixPaint(self, pose: Pose, width: float, height: float, leadSize: float) -> list:
+    def createMatrixPaint(self, pose: Pose, width: float, height: float, leadSize: float, flag=False) -> list:
         """
         pose - start pose\n
         width - width painting (m)\n
@@ -116,14 +205,23 @@ class TestPaintSquad(Node):
         array_list = []
         n = int(width / leadSize) + 1
         m = int(height / leadSize) + 1
+        roll, pitch, yaw = euler_from_quaternion([pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w])
+        pi = math.pi
         for i in range(m):
             array_slice = []
             for j in range(n):
                 new_pose = Pose()
                 new_pose.orientation = pose.orientation
-                new_pose.position.x = pose.position.x - self._leadSize * i
-                new_pose.position.y = pose.position.y - self._leadSize * j if i % 2 == 0 else pose.position.y - self._leadSize * (n-j-1)
-                new_pose.position.z = pose.position.z
+                y = leadSize * j if i % 2 == 0 else leadSize * (n-j-1)
+                x = leadSize * i 
+                z = 0
+                if not flag:
+                    xyz = transform_point([x, y, z], [0, 0, 0], [roll-pi/2, pitch, yaw-pi])
+                else:
+                    xyz = transform_point([x, y, z], [0, 0, 0], [roll, pitch, yaw+pi/2])
+                new_pose.position.x = pose.position.x - xyz[0]
+                new_pose.position.y = pose.position.y - xyz[1]
+                new_pose.position.z = pose.position.z - xyz[2]
                 array_slice.append(new_pose)
             array_list.append(array_slice)
         return array_list
@@ -200,12 +298,61 @@ class TestPaintSquad(Node):
 
         self.robot.reset()
 
+def transform_point(point, translation, rotation_angles):
+    translation_vector = np.array(translation)
+    rotation_matrix = euler_rotation_matrix(rotation_angles)
+    point_vector = np.array(point)
+    translated_point = point_vector + translation_vector
+    rotated_point = np.around(np.dot(rotation_matrix, translated_point), 5)
+    return rotated_point
+
+def rotate_origin(point, origin, rotation_angles):
+    rotation_matrix = euler_rotation_matrix(rotation_angles)
+    point_vector = np.array(point)
+    translated_point = point_vector - origin
+    rotated_point = np.around(np.dot(rotation_matrix, translated_point), 5)
+    rotated_point += origin
+    return rotated_point
+
+def euler_rotation_matrix(rotation_angles):
+    # Создание матрицы поворота по углу X
+    rotation_matrix_x = rotx(float(rotation_angles[0]))
+    # Создание матрицы поворота по углу Y
+    rotation_matrix_y = roty(float(rotation_angles[1]))
+    # Создание матрицы поворота по углу Z
+    rotation_matrix_z = rotz(float(rotation_angles[2]))
+    rotation_matrix = np.dot(rotation_matrix_z, np.dot(rotation_matrix_y, rotation_matrix_x))
+    return rotation_matrix
+
+def rotx(alpha):
+    # Создание матрицы поворота по углу X
+    rotation_matrix_x = np.array([[1, 0, 0],
+                                [0, np.cos(alpha), -np.sin(alpha)],
+                                [0, np.sin(alpha), np.cos(alpha)]])
+    return rotation_matrix_x
+
+def roty(beta):
+    # Создание матрицы поворота по углу Y
+    rotation_matrix_y = np.array([[np.cos(beta), 0, np.sin(beta)],
+                                [0, 1, 0],
+                                [-np.sin(beta), 0, np.cos(beta)]])
+    return rotation_matrix_y
+
+def rotz(gamma):
+    # Создание матрицы поворота по углу Z
+    rotation_matrix_z = np.array([[np.cos(gamma), -np.sin(gamma), 0],
+                                [np.sin(gamma), np.cos(gamma), 0],
+                                [0, 0, 1]])
+    return rotation_matrix_z
+
 
 def main(args=None):
     rclpy.init(args=args)
     node = TestPaintSquad()
-    # rclpy.spin(node)
-    rclpy.shutdown()
+    input("Wait enter for move to point 🐢")
+    node.MoveToStartPoint()
+    while KeyboardInterrupt:
+        node.run()
 
 
 if __name__ == '__main__':
