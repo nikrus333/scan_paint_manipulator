@@ -12,6 +12,7 @@ class ModeWork(Enum):
     SCAN_AND_PAINT = 1
     CALCULATE_RANGE = 2
     ONLY_PAINT = 3
+    G_CODE_MODE = 4
 
 
 @unique

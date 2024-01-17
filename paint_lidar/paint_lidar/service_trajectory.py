@@ -370,9 +370,6 @@ class ServiceTrajectory(Node):
         pose1 = Pose()
         pose2 = Pose()
 
-        # pose1.position.x = 47/1000
-        # pose1.position.y = -406/1000
-        # pose1.position.z = 289/1000
         # r1 = R.from_euler('zyx', [0 * pi / 180, 0 * pi / 180, 180 * pi / 180])
         r1 = R.from_euler('zyx', [math.radians(
             90), math.radians(0), math.radians(90)])
@@ -385,10 +382,6 @@ class ServiceTrajectory(Node):
         pose1.orientation.y = math.radians(0)
         pose1.orientation.z = math.radians(90)
         pose1.orientation.w = w
-
-        # pose2.position.x = 47/1000
-        # pose2.position.y = -592/1000
-        # pose2.position.z = 291/1000
 
         pose2.position.x = 0.65
         pose2.position.y = -0.39
@@ -535,6 +528,10 @@ class ServiceTrajectory(Node):
         mode_work = request.mode_work
         print(mode_work, type(mode_work))
         match mode_work:
+            case ModeWork.G_CODE_MODE.value:
+                array_traject_msg = self.tf_listener_traject_manipulator()
+                
+                self.send_goal(array_traject_msg) 
             case ModeWork.SCAN_AND_PAINT.value:
                 response_client = self.send_request(mode_work)
                 # x_data, y_data, z_data = response_client.x_data, response_client.y_data, response_client.z_data
@@ -547,47 +544,6 @@ class ServiceTrajectory(Node):
                                                         [0, 0, 1, 0],
                                                         [0, 0, 0, 1]]))
 
-                # plane_list = paint.DetectMultiPlanes(
-                #     pcd_new, min_ratio=0.15, threshold=0.017, iterations=1000)
-                
-                # if SelectModeWork.VISUALIZATION.value:
-                #     paint.DrawPlanes(plane_list)
-
-                # if len(plane_list) > 1:
-                #     plane_list = paint.select_plane(plane_list)
-                #     # plane_list = [plane_list.pop(0)]
-                # else:
-                #     response.message += "Обнаружена одна поверхность\n"
-                
-                # if self.count_paint_make == 0:    
-                #     self.array_slice, self.euler, self.rotation, self.trans, self.dist_point_to_plane, self.step = paint.CreateTraectory_circle_vertical(
-                #         plane_list)
-                #     response.message += f"Дистанция до поверхности: {self.dist_point_to_plane}\n"
-                #     if (self.dist_point_to_plane < ParametrsManipulator.MIN_DISTATION.value
-                #             or self.dist_point_to_plane > ParametrsManipulator.MAX_DISTATION.value):
-
-                #         response.message += "Дистанция слишком мала/велика\n"
-                #         response.message += "Передвиньте стрелу"
-
-                #     euler1 = paint.rot2euler(self.rotation)
-                #     self.array_traject_msg = self.create_msg(
-                #         self.array_slice, euler1)
-                    
-                #     self.rotation, self.trans = self.rotation, self.trans
-                #     transform_manipulator_eig = self.tf_eig(self.rotation, self.trans)
-                #     global_tf_slice = self.tf_call_tool(array_slice=self.array_slice, euler=self.rotation)
-                #     transform_world_manipulator = self.listener_tf()
-                #     self.transform_eig_world = test_driver_laser.PaintScanWall.sum_tf_stemp(transform_world_manipulator, transform_manipulator_eig, 
-                #                                                                     self.get_clock().now().to_msg())
-                #     self.tf_eig_world(self.transform_eig_world)
-                #     self.send_request_angle(self.transform_eig_world, self.step)
-                # else:
-                #     transform_manipulator_eig = self.tf_eig(self.rotation, self.trans)
-                #     transform_world_manipulator = self.listener_tf()
-                #     self.transform_eig_world = test_driver_laser.PaintScanWall.sum_tf_stemp(transform_world_manipulator, transform_manipulator_eig, 
-                #                                                                     self.get_clock().now().to_msg())
-                #     _0, _01, self.rotation, _02, _03, _04 = paint.CreateTraectory_circle_vertical(
-                #         plane_list)
                 response.success = True
                 return response
                         

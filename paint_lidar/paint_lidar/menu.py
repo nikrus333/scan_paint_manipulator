@@ -12,8 +12,7 @@ from rclpy.action import ActionClient
 from example_interfaces.action import ExecuteTrajectoryArray
 from example_interfaces.srv import SetBool, TrajectoryMode
 
-from lidar_utils import test_driver_laser
-from lidar_utils.enum_set import ModeWork, ChooseStartManip
+from .lidar_utils.enum_set import ModeWork, ChooseStartManip
 
 
 class MinimalClientAsync(Node):
@@ -44,17 +43,25 @@ class MinimalClientAsync(Node):
     def chose_mode_work(self) -> int:
         while True:
             print('Введите номер режима работы')
-            print(f'{ModeWork.SCAN_AND_PAINT.value} - сканировние и окраска')
-            print(f'{ModeWork.CALCULATE_RANGE.value} - расстояние до поверхности')
-            print(f'{ModeWork.ONLY_PAINT.value} - окраска, без сканирования')
+            print(f'{ModeWork.SCAN_AND_PAINT.value} - автоматическое сканирование и обработка')
+            print(f'{ModeWork.CALCULATE_RANGE.value} - работа с g-code')
             mode_work = input()
             if mode_work.isdigit():
                 mode_work = int(mode_work)
-            if (mode_work == ModeWork.SCAN_AND_PAINT.value) or (mode_work == ModeWork.ONLY_PAINT.value) or (mode_work == ModeWork.CALCULATE_RANGE.value):
-                break
+                number_operation = ModeWork.G_CODE_MODE.value
             else:
-                print('Некорректный ввод')
-        return mode_work
+                print('Введите номер операции')
+                print(f'{ModeWork.SCAN_AND_PAINT.value} - сканировние и окраска')
+                print(f'{ModeWork.CALCULATE_RANGE.value} - расстояние до поверхности')
+                print(f'{ModeWork.ONLY_PAINT.value} - окраска, без сканирования')
+                number_operation = input()
+                if number_operation.isdigit():
+                    number_operation = int(number_operation)
+                if (number_operation == ModeWork.SCAN_AND_PAINT.value) or (number_operation == ModeWork.ONLY_PAINT.value) or (number_operation == ModeWork.CALCULATE_RANGE.value):
+                    break
+                else:
+                    print('Некорректный ввод')
+            return number_operation
 
     def chose_start_manip(self) -> int:
         while True:
@@ -112,6 +119,11 @@ def main(args=None):
                             request.choose_start_manip = choose_start_manip
                             response = minimal_client.send_request_trajectory(request)
                             pass 
+            case ModeWork.G_CODE_MODE.value:
+                print("Wait until the G-code programm is completed 🐢")
+                request.mode_work = mode_work
+                request.choose_start_manip = 0
+                response = minimal_client.send_request_trajectory(request)
         print('______________________________________')
     minimal_client.destroy_node()
     rclpy.shutdown()
