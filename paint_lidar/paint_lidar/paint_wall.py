@@ -26,10 +26,10 @@ from threading import Event
 from ament_index_python.packages import get_package_share_directory
 from scipy.spatial.transform import Rotation as R
 
-from lidar_utils import test_driver_laser
-from lidar_utils import servoPy
-from lidar_utils.enum_set import SelectModeWork
-from lidar_utils.trajectory import euler_from_quaternion, quaternion_from_euler
+from .lidar_utils import test_driver_laser
+from .lidar_utils import servoPy
+from .lidar_utils.enum_set import SelectModeWork
+from .lidar_utils.trajectory import euler_from_quaternion, quaternion_from_euler
 
 class ServiceFromService(Node):
 
@@ -316,21 +316,25 @@ class ServiceFromService(Node):
             if value == [0, 0, 0, 0, 0, 0]:
                 return False
             trans, euler = value[:3], value[3:]
-            trans_init, R = self.hok.coord_euler_to_matrix(trans, euler)
-            self.pcd = self.pcd + self.hok.read_laser(trans_init, R)
+            if not SelectModeWork.LIDAR_SIMULATION.value:
+                trans_init, R = self.hok.coord_euler_to_matrix(trans, euler)
+                self.pcd = self.pcd + self.hok.read_laser(trans_init, R)
+            else:
+                self.pcd = self.pcd
         if self.scan_wall_flag == False:
             value = feedback_msg.feedback.robot_state
             if value == [0, 0, 0, 0, 0, 0]:
                 return False
             trans, euler = value[:3], value[3:]
-
-            trans_init, R = self.hok.coord_euler_to_matrix(trans, euler)
-
-            dist_x = self.hok.read_laser_scan_dist(trans_init, R)
-            if dist_x > 0:
-                print('К стенене на : ', dist_x)
+            if not SelectModeWork.LIDAR_SIMULATION.value:
+                trans_init, R = self.hok.coord_euler_to_matrix(trans, euler)
+                dist_x = self.hok.read_laser_scan_dist(trans_init, R)
+                if dist_x > 0:
+                    print('К стенене на : ', dist_x)
+                else:
+                    print('От стены на :', dist_x)
             else:
-                print('От стены на :', dist_x)
+                print('К стенене на : -')
             
 
     def goal_response_callback(self, future):
