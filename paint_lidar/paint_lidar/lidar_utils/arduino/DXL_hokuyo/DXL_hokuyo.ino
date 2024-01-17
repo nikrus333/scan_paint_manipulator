@@ -1,4 +1,4 @@
-#include "DxlMaster.h"
+#include <DxlMaster.h>
 
 #define openValue    530
 #define closeValue   515
@@ -40,6 +40,7 @@ void loop() {
     command = receivedData;
     if (command == "n") {
       digitalWrite(LED_BUILTIN, HIGH);
+      delay(600);
       if (!state) motor1.goalPosition(openValue);
       Serial.println("Open");
       state = true;

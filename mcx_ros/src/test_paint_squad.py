@@ -32,7 +32,7 @@ class TestPaintSquad(Node):
         self._acc = 0.4
         self._tool_leng = 0.185
         self._dist_paint = 0.05
-        self._leadSize  = 0.01
+        self._leadSize  = 0.005
         self._offset = Point(x=.0, y=.0, z=-0.085)
 
         self.callback_group = ReentrantCallbackGroup()
@@ -107,10 +107,10 @@ class TestPaintSquad(Node):
     
     def missionChess(self):
         # Settings
-        width = 0.10
+        width = 0.08 - self._leadSize
         height = width
         leadSize = self._leadSize
-        n = 3 # rows
+        n = 2 # rows
         m = 3 # colums
         
         for i in range(n):
@@ -119,7 +119,7 @@ class TestPaintSquad(Node):
                 if i % 2 == 1 and j % 2 == 0: continue
                 if i % 2 == 0 and j % 2 == 1: continue
                 pose = Pose()
-                pose.position.x = 0.800 + self._offset.x - height * i
+                pose.position.x = 0.700 + self._offset.x - height * i
                 pose.position.y = 0.0 + self._offset.y - width * j
                 pose.position.z = self._dist_paint + self._tool_leng + self._offset.z
                 q = quaternion_from_euler(math.radians(180), math.radians(0), math.radians(90))
@@ -167,7 +167,6 @@ class TestPaintSquad(Node):
         pose.orientation.w = q[3]
         array_list = self.createMatrixPaint(pose, width=width - (height if connect else 0), height=height, leadSize=self._leadSize, flag=True)
         print("len", len(array_list))
-        print(array_list[0], array_list[1], array_list[2])
         for i, line in enumerate(array_list):
             print("line:", i + 1)
             self.MovePoints(line, self._vel, self._acc, self.req, self.motorcortex_types)  
@@ -175,8 +174,8 @@ class TestPaintSquad(Node):
     
     def missionSquad(self):
         # Settings
-        width = 0.15
-        height = 0.15
+        width = 0.100
+        height = 0.100
         leadSize = self._leadSize
         
         pose = Pose()
@@ -203,8 +202,8 @@ class TestPaintSquad(Node):
         leadSize - radious nozzle spraying (m)\n
         """
         array_list = []
-        n = int(width / leadSize) + 1
-        m = int(height / leadSize) + 1
+        n = int(width / leadSize)
+        m = int(height / leadSize)
         roll, pitch, yaw = euler_from_quaternion([pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w])
         pi = math.pi
         for i in range(m):
@@ -212,8 +211,8 @@ class TestPaintSquad(Node):
             for j in range(n):
                 new_pose = Pose()
                 new_pose.orientation = pose.orientation
-                y = leadSize * j if i % 2 == 0 else leadSize * (n-j-1)
-                x = leadSize * i 
+                y = (leadSize * j) + leadSize/2 if i % 2 == 0 else leadSize * (n+1-j-1) - leadSize/2
+                x = leadSize * i + leadSize/2
                 z = 0
                 if not flag:
                     xyz = transform_point([x, y, z], [0, 0, 0], [roll-pi/2, pitch, yaw-pi])
@@ -353,6 +352,9 @@ def main(args=None):
     node.MoveToStartPoint()
     while KeyboardInterrupt:
         node.run()
+    else:
+        node.send_request(False)
+        
 
 
 if __name__ == '__main__':
