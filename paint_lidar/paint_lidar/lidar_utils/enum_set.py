@@ -2,6 +2,7 @@ from enum import Enum, unique
 
 
 class SelectModeWork(Enum):
+    NOZZLE_SIMULATION = True    
     SERVO_LIDAR_SIMULATION = False    
     MANIPULATOR_SIMULATION = False
     LIDAR_SIMULATION = False
