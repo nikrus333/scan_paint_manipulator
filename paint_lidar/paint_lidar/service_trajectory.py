@@ -26,6 +26,7 @@ from example_interfaces.srv import SetPC2, SetAngle, PoseTf, TrajectoryMode
 from .lidar_utils import test_driver_laser, trajectory
 from .lidar_utils.enum_set import ModeWork, ChooseStartManip, ParametrsManipulator, SelectModeWork
 from .lidar_utils.trajectory import euler_from_quaternion
+from .lidar_utils.gcode import Gcode
 
 
 class ServiceTrajectory(Node):
@@ -345,10 +346,9 @@ class ServiceTrajectory(Node):
         return last_points
 
 
-    def send_goal(self, array_traject_msg):
+    def send_goal(self, array_traject_msg: PoseArray):
         goal_msg = ExecuteTrajectoryArray.Goal()
         pi = math.pi
-        print(array_traject_msg[0])
         for traject in array_traject_msg:
             goal_msg.poses_array.append(traject)
 
@@ -477,7 +477,7 @@ class ServiceTrajectory(Node):
         
         return transform_stamped_msg2
     
-    def tf_listener_traject_manipulator(self):
+    def tf_listener_traject_manipulator(self) -> list[PoseArray]:
         array_traject_msg = []
         slices = 3
         name_point = str(self.count_paint_make)
@@ -529,9 +529,28 @@ class ServiceTrajectory(Node):
         print(mode_work, type(mode_work))
         match mode_work:
             case ModeWork.G_CODE_MODE.value:
-                array_traject_msg = self.tf_listener_traject_manipulator()
-                
-                self.send_goal(array_traject_msg) 
+                # array_traject_msg = self.listener_tf_trajectory("manipulator", "world")
+                path = request.path
+                g = Gcode(path)
+                array_lines = g.get_array()
+                array_traject_msg = []
+                array_pose = PoseArray()
+                for point in array_lines:
+                    pose = Pose()
+                    pose.position.x = point[0]
+                    pose.position.y = point[1]
+                    pose.position.z = point[2]
+                    q = trajectory.quaternion_from_euler(point[3], point[4], point[5])
+                    pose.orientation.x = q[0]
+                    pose.orientation.y = q[1]
+                    pose.orientation.z = q[2]
+                    pose.orientation.w = q[3]
+                    array_pose.poses.append(pose)
+                array_traject_msg.append(array_pose)
+                print(type(array_traject_msg), array_traject_msg)             
+                self.send_goal(array_traject_msg)
+                response.success = True
+                return response
             case ModeWork.SCAN_AND_PAINT.value:
                 response_client = self.send_request(mode_work)
                 # x_data, y_data, z_data = response_client.x_data, response_client.y_data, response_client.z_data

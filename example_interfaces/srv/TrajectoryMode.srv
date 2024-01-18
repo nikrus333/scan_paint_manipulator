@@ -1,5 +1,6 @@
 int32 mode_work 
 int32 choose_start_manip
+string path
 ---
 bool success
 string message
