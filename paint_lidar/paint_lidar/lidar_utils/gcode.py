@@ -1,33 +1,101 @@
 import os
 import numpy as np
+from dataclasses import dataclass
 from math import radians 
 import gcodeparser
+
+@dataclass
+class PoseGcode():
+    x: float
+    y: float
+    z: float
+    nx: float
+    ny: float
+    nz: float
+    
+@dataclass
+class MOVL():
+    type: str
+    pose: PoseGcode
+    
+@dataclass
+class MOVC():
+    type: str
+    start: PoseGcode
+    middle: PoseGcode
+    end: PoseGcode
 
 class Gcode():
     def __init__(self, path: str) -> None:
         self._path = path
-        self._array = []
         gcode_line = self.GcodeFromPath(self._path)
-        array_ = self.GcodeToArray(gcode_line)
-        for move in array_:
-            if move['type'] == "L":
-                for point in move['points']:
-                    self._array.append(point)
+        self._command = self.GcodeToArr(gcode_line)
         pass
     
-    def get_array(self) -> np.ndarray:
-        return self._array
+    def get_commands(self) -> list[MOVC | MOVL]:
+        return self._command
+    
+    def get_type(self) -> str:
+        return self._command
     
     def get_path(self) -> str:
         return self._path
     
     @staticmethod
+    def GcodeToArr(gcode_line: list[str]) -> list[MOVC | MOVL]:
+        list_command = []
+        for line in gcode_line:
+            # Разделяем строку по символу пробела или символу перед значением
+            line = line.split(" ")
+            command = None
+            if line[0] == "MOVL":
+                pose = PoseGcode(
+                    x = float(line[1][1:]),
+                    y = float(line[2][1:]),
+                    z = float(line[3][1:]),
+                    nx = float(line[4][1:]),
+                    ny = float(line[5][1:]),
+                    nz = float(line[6][1:]),
+                )
+                command = MOVL(type="MOVL", pose=pose)
+                
+            if line[0] == "MOVC":
+                start = PoseGcode(
+                    x = float(line[1][2:]),
+                    y = float(line[2][2:]),
+                    z = float(line[3][2:]),
+                    nx = float(line[4][2:]),
+                    ny = float(line[5][2:]),
+                    nz = float(line[6][2:]),
+                    )
+                middle = PoseGcode(
+                    x = float(line[7][2:]),
+                    y = float(line[8][2:]),
+                    z = float(line[9][2:]),
+                    nx = float(line[10][2:]),
+                    ny = float(line[11][2:]),
+                    nz = float(line[12][2:]),
+                )
+                end = PoseGcode(
+                    x = float(line[13][2:]),
+                    y = float(line[14][2:]),
+                    z = float(line[15][2:]),
+                    nx = float(line[16][2:]),
+                    ny = float(line[17][2:]),
+                    nz = float(line[18][2:]),
+                )
+                command = MOVC(type=line[0], start=start, middle=middle, end=end)
+            if command != None:
+                list_command.append(command)
+        return list_command
+    
+    @staticmethod
     def GcodeFromPath(path: str) -> str:
         f = open(path, "r")
         lines = f.readlines()
-        gcode_line = ""
+        gcode_line = []
         for line in lines:
-            gcode_line += line
+            gcode_line.append(line.replace('\n', ''))
         return gcode_line
     
     @staticmethod
@@ -63,9 +131,10 @@ class Gcode():
 
     
 if __name__ == "__main__":
-    path = os.getcwd() + "/paint_lidar/resource/gcode/test_gcode.gcode"
+    path = os.getcwd() + "/paint_lidar/resource/gcode/TestC.gcode"
     g = Gcode(path)
-    print(g.get_array())
+    command = g.get_commands()
+    print(command)
     pass
     
     
