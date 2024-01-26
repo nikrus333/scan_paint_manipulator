@@ -1,4 +1,4 @@
-geometry_msgs/PoseArray[] poses_array
+TrajectoryMsg[] trajectory_array
 float64 velocity
 float64 acceleration
 float64 rotational_velocity
