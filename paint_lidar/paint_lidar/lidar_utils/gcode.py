@@ -44,6 +44,7 @@ class Gcode():
     @staticmethod
     def GcodeToArr(gcode_line: list[str]) -> list[MOVC | MOVL]:
         list_command = []
+        last_pose = PoseGcode(.0, .0, .0, .0, .0, .0)
         for line in gcode_line:
             # Разделяем строку по символу пробела или символу перед значением
             line = line.split(" ")
@@ -53,37 +54,32 @@ class Gcode():
                     x = float(line[1][1:]),
                     y = float(line[2][1:]),
                     z = float(line[3][1:]),
-                    nx = float(line[4][1:]),
+                    nz = float(line[4][1:]),
                     ny = float(line[5][1:]),
-                    nz = float(line[6][1:]),
+                    nx = float(line[6][1:]),
                 )
+                last_pose = pose
                 command = MOVL(type="MOVL", pose=pose)
                 
             if line[0] == "MOVC":
-                start = PoseGcode(
+                start = last_pose
+                middle = PoseGcode(
                     x = float(line[1][2:]),
                     y = float(line[2][2:]),
                     z = float(line[3][2:]),
-                    nx = float(line[4][2:]),
+                    nz = float(line[4][2:]),
                     ny = float(line[5][2:]),
-                    nz = float(line[6][2:]),
-                    )
-                middle = PoseGcode(
+                    nx = float(line[6][2:]),
+                )
+                end = PoseGcode(
                     x = float(line[7][2:]),
                     y = float(line[8][2:]),
                     z = float(line[9][2:]),
-                    nx = float(line[10][2:]),
+                    nz = float(line[10][2:]),
                     ny = float(line[11][2:]),
-                    nz = float(line[12][2:]),
+                    nx = float(line[12][2:]),
                 )
-                end = PoseGcode(
-                    x = float(line[13][2:]),
-                    y = float(line[14][2:]),
-                    z = float(line[15][2:]),
-                    nx = float(line[16][2:]),
-                    ny = float(line[17][2:]),
-                    nz = float(line[18][2:]),
-                )
+                last_pose = end
                 command = MOVC(type=line[0], start=start, middle=middle, end=end)
             if command != None:
                 list_command.append(command)

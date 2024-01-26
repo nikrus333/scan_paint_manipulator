@@ -10,6 +10,7 @@ from geometry_msgs.msg import Pose, PoseArray
 from std_msgs.msg import Bool
 from scipy.spatial.transform import Rotation as R
 from example_interfaces.srv import OpenClose
+from example_interfaces.msg import TrajectoryMsg, CommandPose, PoseMsg
 
 import motorcortex
 import math
@@ -17,6 +18,7 @@ import time
 from libs.motion_program import Waypoint, MotionProgram, PoseTransformer
 from libs.robot_command import RobotCommand
 from libs.system_defs import InterpreterStates
+from paint_lidar.lidar_utils.gcode import Gcode, MOVC, MOVL
 from paint_lidar.lidar_utils.trajectory import euler_from_quaternion, quaternion_from_euler
 
 # from robot_control.motion_program import Waypoint, MotionProgram, PoseTransformer
@@ -105,7 +107,7 @@ class ExecuteTrajectoryAction(Node):
 
         result = ExecuteTrajectoryArray.Result()
         feedback_msg = ExecuteTrajectoryArray.Feedback()
-        poses_array = goal_handle.request.poses_array
+        trajectory = goal_handle.request.trajectory_array #[TrajectoryMsg]
         vel = goal_handle.request.velocity
         acceleration = goal_handle.request.acceleration
         rotational_velocity = goal_handle.request.rotational_velocity
@@ -115,40 +117,77 @@ class ExecuteTrajectoryAction(Node):
         # print(f"poses_array: {poses_array}")
         type_traject_bool = False
         rotate = False
-        buff_point = None   
-        if len(poses_array) > 2:
+        buff_point = None 
+        # Количество траектирий в массива
+        if len(trajectory) > 2:
             rotate = True
         if type_traject == 'color':
             type_traject_bool = True
-        for count_line, arr in enumerate(poses_array):
+        # Проход по кол-ву траекторий
+        for count_line, commands in enumerate(trajectory):
             type_traject_bool = False
             if type_traject == 'color':
                 type_traject_bool = True
             motion_program = MotionProgram(self.req, self.motorcortex_types)
             points = []
-            for pose in arr.poses:
-                x = pose.position.x
-                y = pose.position.y
-                z = pose.position.z
-                roll, pitch, yaw = euler_from_quaternion([pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w])
-                # r = R.from_quat(
-                #     [pose.orientation.x, pose.orientation.y, pose.orientation.z, pose.orientation.w])
-                # psi, theta, phi = r.as_euler('zyx')
-                points.append(Waypoint(
-                    [x, y, z, roll, pitch, yaw]))
+            print("trajectory:", trajectory)
+            # Проход по командам внутри траектории
+            for i, pose in enumerate(commands.command):
+                if pose.type == "MOVL":
+                    points = []
+                    x = pose.start.x
+                    y = pose.start.y
+                    z = pose.start.z
+                    nx = pose.start.nx
+                    ny = pose.start.ny
+                    nz = pose.start.nz
+                    points.append(Waypoint([x, y, z, nz, ny, nx]))
+                    
+                    joint_params = self.joint_subscription.read()
+                    value = joint_params[0].value
+                    print(value)
+                    reference_joint_coord = value
+                    motion_program.addMoveL(
+                        points, vel, acceleration, rotational_velocity, rotational_acceleration, reference_joint_coord)
+                    
+                if pose.type == "MOVC":
+                    points = []
+                    x = pose.start.x
+                    y = pose.start.y
+                    z = pose.start.z
+                    nx = pose.start.nx
+                    ny = pose.start.ny
+                    nz = pose.start.nz
+                    points.append(Waypoint([x, y, z, nz, ny, nx]))
+                    
+                    x = pose.middle.x
+                    y = pose.middle.y
+                    z = pose.middle.z
+                    nx = pose.middle.nx
+                    ny = pose.middle.ny
+                    nz = pose.middle.nz
+                    points.append(Waypoint([x, y, z, nz, ny, nx]))
 
-            joint_params = self.joint_subscription.read()
-            value = joint_params[0].value
-            print(value)
-            reference_joint_coord = value
+                    x = pose.end.x
+                    y = pose.end.y
+                    z = pose.end.z
+                    nx = pose.end.nx
+                    ny = pose.end.ny
+                    nz = pose.end.nz
+                    points.append(Waypoint([x, y, z, nz, ny, nx]))
+                    
+                    joint_params = self.joint_subscription.read()
+                    value = joint_params[0].value
+                    reference_joint_coord = value
+                    motion_program.addMoveC(waypoint_list=points, angle=radians(90), velocity=vel)
 
             # //////////////////////////////////////////////
             if rotate and count_line == 2 and type_traject == 'color':
                 buff_point = points[0]
             # //////////////////////////////////////////////
 
-            motion_program.addMoveL(
-                points, vel, acceleration, rotational_velocity, rotational_acceleration, ref_joint_coord_rad=reference_joint_coord)
+            # motion_program.addMoveL(
+            #     points, vel, acceleration, rotational_velocity, rotational_acceleration)
             # motion_program.addMoveL(points, vel, acceleration)
 
             motion_program.send("test1").get()
@@ -189,10 +228,10 @@ class ExecuteTrajectoryAction(Node):
             if rotate and type_traject == 'color':
                 if count_line == 1:
                     self.RotateGrip(True)
-                if count_line == len(poses_array) - 1:
+                if count_line == len(trajectory) - 1:
                     self.RotateGrip(False, [buff_point])
             
-            if count_line == len(poses_array) - 1 and type_traject == 'color':
+            if count_line == len(trajectory) - 1 and type_traject == 'color':
                 self.MoveToStartPoint()
             # ////////////////////////////////////////////
 

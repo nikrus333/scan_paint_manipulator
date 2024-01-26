@@ -22,11 +22,12 @@ from tf2_ros.transform_listener import TransformListener
 
 from example_interfaces.action import ExecuteTrajectoryArray
 from example_interfaces.srv import SetPC2, SetAngle, PoseTf, TrajectoryMode
+from example_interfaces.msg import CommandPose, TrajectoryMsg, PoseMsg
 
 from .lidar_utils import test_driver_laser, trajectory
 from .lidar_utils.enum_set import ModeWork, ChooseStartManip, ParametrsManipulator, SelectModeWork
 from .lidar_utils.trajectory import euler_from_quaternion
-from .lidar_utils.gcode import Gcode
+from .lidar_utils.gcode import Gcode, MOVC, MOVL
 
 
 class ServiceTrajectory(Node):
@@ -346,12 +347,11 @@ class ServiceTrajectory(Node):
         return last_points
 
 
-    def send_goal(self, array_traject_msg: PoseArray):
+    def send_goal(self, array_traject_msg: list):
         goal_msg = ExecuteTrajectoryArray.Goal()
         pi = math.pi
         for traject in array_traject_msg:
-            goal_msg.poses_array.append(traject)
-
+            goal_msg.trajectory_array.append(traject)
         goal_msg.acceleration = 0.02
         goal_msg.velocity = 0.08
         goal_msg.type_traject = 'color'
@@ -532,22 +532,61 @@ class ServiceTrajectory(Node):
                 # array_traject_msg = self.listener_tf_trajectory("manipulator", "world")
                 path = request.path
                 g = Gcode(path)
-                array_lines = g.get_array()
+                array_lines = g.get_commands()
                 array_traject_msg = []
-                array_pose = PoseArray()
+                trajectory = TrajectoryMsg()
                 for point in array_lines:
-                    pose = Pose()
-                    pose.position.x = point[0]
-                    pose.position.y = point[1]
-                    pose.position.z = point[2]
-                    q = trajectory.quaternion_from_euler(point[3], point[4], point[5])
-                    pose.orientation.x = q[0]
-                    pose.orientation.y = q[1]
-                    pose.orientation.z = q[2]
-                    pose.orientation.w = q[3]
-                    array_pose.poses.append(pose)
-                array_traject_msg.append(array_pose)
-                print(type(array_traject_msg), array_traject_msg)             
+                    if point.type == "MOVL":
+                        command = CommandPose()
+                        command.type = point.type
+                        
+                        start = PoseMsg()
+                        start.x = point.pose.x / 1000
+                        start.y = point.pose.y / 1000
+                        start.z = point.pose.z / 1000
+                        start.nx = math.radians(point.pose.nx)
+                        start.ny = math.radians(point.pose.ny)
+                        start.nz = math.radians(point.pose.nz)
+                        
+                        command.start = start
+                        command.middle = PoseMsg()
+                        command.end = PoseMsg()
+
+                    if point.type == "MOVC":
+                        command = CommandPose()
+                        command.type = point.type
+                        
+                        start = PoseMsg()
+                        start.x = point.start.x / 1000
+                        start.y = point.start.y / 1000
+                        start.z = point.start.z / 1000
+                        start.nx = math.radians(point.start.nx)
+                        start.ny = math.radians(point.start.ny)
+                        start.nz = math.radians(point.start.nz)
+                        
+                        middle = PoseMsg()
+                        middle.x = point.middle.x / 1000
+                        middle.y = point.middle.y / 1000
+                        middle.z = point.middle.z / 1000
+                        middle.nx = math.radians(point.middle.nx)
+                        middle.ny = math.radians(point.middle.ny)
+                        middle.nz = math.radians(point.middle.nz)
+                        
+                        end = PoseMsg()
+                        end.x = point.end.x / 1000
+                        end.y = point.end.y / 1000
+                        end.z = point.end.z / 1000
+                        end.nx = math.radians(point.end.nx)
+                        end.ny = math.radians(point.end.ny)
+                        end.nz = math.radians(point.end.nz)
+                        
+                        command.start = start
+                        command.middle = middle
+                        command.end = end
+                        pass
+                    
+                    trajectory.command.append(command)
+                array_traject_msg.append(trajectory)            
                 self.send_goal(array_traject_msg)
                 response.success = True
                 return response
