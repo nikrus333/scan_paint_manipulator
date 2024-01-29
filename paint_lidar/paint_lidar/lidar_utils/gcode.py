@@ -16,11 +16,14 @@ class PoseGcode():
 @dataclass
 class MOVL():
     type: str
+    paint: bool
     pose: PoseGcode
     
 @dataclass
 class MOVC():
     type: str
+    paint: bool
+    angle: float
     start: PoseGcode
     middle: PoseGcode
     end: PoseGcode
@@ -30,25 +33,49 @@ class Gcode():
         self._path = path
         gcode_line = self.GcodeFromPath(self._path)
         self._command = self.GcodeToArr(gcode_line)
+        self._trajectories = self.TrajectoriesFromCommand(self._command)
         pass
     
     def get_commands(self) -> list[MOVC | MOVL]:
         return self._command
     
-    def get_type(self) -> str:
-        return self._command
+    def get_trajectories(self) -> list[list[MOVC | MOVL]]:
+        return self._trajectories
     
     def get_path(self) -> str:
         return self._path
     
     @staticmethod
+    def TrajectoriesFromCommand(commands: list[MOVC | MOVL]):
+        trajectories = []
+        list_commands = []
+        paint_state = False
+        for command in commands:
+            if paint_state == command.paint:
+                list_commands.append(command)
+            else:
+                trajectories.append(list_commands.copy())
+                paint_state = not paint_state
+                list_commands.clear()
+                list_commands.append(command)
+        return trajectories
+    
+    @staticmethod
     def GcodeToArr(gcode_line: list[str]) -> list[MOVC | MOVL]:
         list_command = []
+        paint = False
         last_pose = PoseGcode(.0, .0, .0, .0, .0, .0)
         for line in gcode_line:
             # Разделяем строку по символу пробела или символу перед значением
             line = line.split(" ")
             command = None
+            
+            if line[0] == "F1":
+                paint = True
+                
+            if line[0] == "F0":
+                paint = False
+                
             if line[0] == "MOVL":
                 pose = PoseGcode(
                     x = float(line[1][1:]),
@@ -59,7 +86,7 @@ class Gcode():
                     nx = float(line[6][1:]),
                 )
                 last_pose = pose
-                command = MOVL(type="MOVL", pose=pose)
+                command = MOVL(type="MOVL", pose=pose, paint=paint)
                 
             if line[0] == "MOVC":
                 start = last_pose
@@ -79,8 +106,9 @@ class Gcode():
                     ny = float(line[11][2:]),
                     nx = float(line[12][2:]),
                 )
+                angle = float(line[13][3:])
                 last_pose = end
-                command = MOVC(type=line[0], start=start, middle=middle, end=end)
+                command = MOVC(type=line[0], start=start, middle=middle, end=end, paint=paint, angle=angle)
             if command != None:
                 list_command.append(command)
         return list_command
@@ -130,7 +158,9 @@ if __name__ == "__main__":
     path = os.getcwd() + "/paint_lidar/resource/gcode/TestC.gcode"
     g = Gcode(path)
     command = g.get_commands()
-    print(command)
+    trajectories = g.get_trajectories()
+    for i, traj in enumerate(trajectories):
+        print(f"{i} -", traj, "\n")
     pass
     
     

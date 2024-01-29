@@ -467,7 +467,7 @@ class ServiceTrajectory(Node):
         self.tf_broadcaster.sendTransform(transform_stamped_msg2)
         return transform_stamped_msg2
 
-    def tf_eig_world(self, tf):
+    def tf_eig_world(self, tf: TransformStamped):
         # tf_broadcaster = StaticTransformBroadcaster(self)
         now = self.get_clock().now()
         transform_stamped_msg2 = tf
@@ -532,61 +532,67 @@ class ServiceTrajectory(Node):
                 # array_traject_msg = self.listener_tf_trajectory("manipulator", "world")
                 path = request.path
                 g = Gcode(path)
-                array_lines = g.get_commands()
+                trajectories = g.get_trajectories()
                 array_traject_msg = []
-                trajectory = TrajectoryMsg()
-                for point in array_lines:
-                    if point.type == "MOVL":
-                        command = CommandPose()
-                        command.type = point.type
-                        
-                        start = PoseMsg()
-                        start.x = point.pose.x / 1000
-                        start.y = point.pose.y / 1000
-                        start.z = point.pose.z / 1000
-                        start.nx = math.radians(point.pose.nx)
-                        start.ny = math.radians(point.pose.ny)
-                        start.nz = math.radians(point.pose.nz)
-                        
-                        command.start = start
-                        command.middle = PoseMsg()
-                        command.end = PoseMsg()
+                for array_lines in trajectories:
+                    trajectory = TrajectoryMsg()
+                    for point in array_lines:
+                        if point.type == "MOVL":
+                            command = CommandPose()
+                            command.type = point.type
+                            command.paint = point.paint
+                            command.angle = .0
+                            
+                            start = PoseMsg()
+                            start.x = point.pose.x / 1000
+                            start.y = point.pose.y / 1000
+                            start.z = point.pose.z / 1000
+                            start.nx = math.radians(point.pose.nx)
+                            start.ny = math.radians(point.pose.ny)
+                            start.nz = math.radians(point.pose.nz)
+                            
+                            command.start = start
+                            command.middle = PoseMsg()
+                            command.end = PoseMsg()
 
-                    if point.type == "MOVC":
-                        command = CommandPose()
-                        command.type = point.type
+                        if point.type == "MOVC":
+                            command = CommandPose()
+                            command.type = point.type
+                            command.paint = point.paint
+                            command.angle = point.angle
+                            
+                            start = PoseMsg()
+                            start.x = point.start.x / 1000
+                            start.y = point.start.y / 1000
+                            start.z = point.start.z / 1000
+                            start.nx = math.radians(point.start.nx)
+                            start.ny = math.radians(point.start.ny)
+                            start.nz = math.radians(point.start.nz)
+                            
+                            middle = PoseMsg()
+                            middle.x = point.middle.x / 1000
+                            middle.y = point.middle.y / 1000
+                            middle.z = point.middle.z / 1000
+                            middle.nx = math.radians(point.middle.nx)
+                            middle.ny = math.radians(point.middle.ny)
+                            middle.nz = math.radians(point.middle.nz)
+                            
+                            end = PoseMsg()
+                            end.x = point.end.x / 1000
+                            end.y = point.end.y / 1000
+                            end.z = point.end.z / 1000
+                            end.nx = math.radians(point.end.nx)
+                            end.ny = math.radians(point.end.ny)
+                            end.nz = math.radians(point.end.nz)
+                            
+                            command.start = start
+                            command.middle = middle
+                            command.end = end
+                            pass
                         
-                        start = PoseMsg()
-                        start.x = point.start.x / 1000
-                        start.y = point.start.y / 1000
-                        start.z = point.start.z / 1000
-                        start.nx = math.radians(point.start.nx)
-                        start.ny = math.radians(point.start.ny)
-                        start.nz = math.radians(point.start.nz)
-                        
-                        middle = PoseMsg()
-                        middle.x = point.middle.x / 1000
-                        middle.y = point.middle.y / 1000
-                        middle.z = point.middle.z / 1000
-                        middle.nx = math.radians(point.middle.nx)
-                        middle.ny = math.radians(point.middle.ny)
-                        middle.nz = math.radians(point.middle.nz)
-                        
-                        end = PoseMsg()
-                        end.x = point.end.x / 1000
-                        end.y = point.end.y / 1000
-                        end.z = point.end.z / 1000
-                        end.nx = math.radians(point.end.nx)
-                        end.ny = math.radians(point.end.ny)
-                        end.nz = math.radians(point.end.nz)
-                        
-                        command.start = start
-                        command.middle = middle
-                        command.end = end
-                        pass
-                    
-                    trajectory.command.append(command)
-                array_traject_msg.append(trajectory)            
+                        trajectory.command.append(command)
+                    array_traject_msg.append(trajectory)         
+                print(array_traject_msg)   
                 self.send_goal(array_traject_msg)
                 response.success = True
                 return response

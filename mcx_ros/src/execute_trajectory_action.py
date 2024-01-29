@@ -113,14 +113,14 @@ class ExecuteTrajectoryAction(Node):
         rotational_velocity = goal_handle.request.rotational_velocity
         rotational_acceleration = goal_handle.request.rotational_acceleration
         type_traject = goal_handle.request.type_traject
-        print(type_traject)
+        print(trajectory)
         # print(f"poses_array: {poses_array}")
         type_traject_bool = False
         rotate = False
         buff_point = None 
         # Количество траектирий в массива
         if len(trajectory) > 2:
-            rotate = True
+            rotate = False
         if type_traject == 'color':
             type_traject_bool = True
         # Проход по кол-ву траекторий
@@ -130,7 +130,7 @@ class ExecuteTrajectoryAction(Node):
                 type_traject_bool = True
             motion_program = MotionProgram(self.req, self.motorcortex_types)
             points = []
-            print("trajectory:", trajectory)
+            # print("trajectory:", trajectory)
             # Проход по командам внутри траектории
             for i, pose in enumerate(commands.command):
                 if pose.type == "MOVL":
@@ -145,7 +145,6 @@ class ExecuteTrajectoryAction(Node):
                     
                     joint_params = self.joint_subscription.read()
                     value = joint_params[0].value
-                    print(value)
                     reference_joint_coord = value
                     motion_program.addMoveL(
                         points, vel, acceleration, rotational_velocity, rotational_acceleration, reference_joint_coord)
@@ -179,7 +178,7 @@ class ExecuteTrajectoryAction(Node):
                     joint_params = self.joint_subscription.read()
                     value = joint_params[0].value
                     reference_joint_coord = value
-                    motion_program.addMoveC(waypoint_list=points, angle=radians(90), velocity=vel)
+                    motion_program.addMoveC(waypoint_list=points, angle=radians(pose.angle), velocity=0.025)
 
             # //////////////////////////////////////////////
             if rotate and count_line == 2 and type_traject == 'color':
@@ -189,27 +188,29 @@ class ExecuteTrajectoryAction(Node):
             # motion_program.addMoveL(
             #     points, vel, acceleration, rotational_velocity, rotational_acceleration)
             # motion_program.addMoveL(points, vel, acceleration)
-
+            type_traject_bool = commands.command[0].paint
+            
             motion_program.send("test1").get()
-            if self.robot.play() is InterpreterStates.MOTION_NOT_ALLOWED_S.value:
+            if self.robot.play(wait_time=0.1) is InterpreterStates.MOTION_NOT_ALLOWED_S.value:
                 print('Robot is not at a start position, moving to the start')
                 if self.robot.moveToStart(200):
                     print('Robot is at the start position')
                 else:
                     raise Exception('Failed to move to the start position')
-                # msg = Bool()
-                # msg.data = type_traject_bool
-                # self.publisher_.publish(msg)
-                # print("1", type_traject_bool)
-                self.send_request(type_traject_bool)
-                self.robot.play()
-
+                self.robot.play(0.1)
+                
+            self.send_request(type_traject_bool)
+            
             while self.robot.getState() is InterpreterStates.PROGRAM_IS_DONE.value:
                 time.sleep(0.1)
                 print('Waiting for the program to start, robot state: {}'.format(
                     self.robot.getState()))
+                
+            flag = True
             while self.robot.getState() is InterpreterStates.PROGRAM_RUN_S.value:
-
+                # if flag:
+                #     self.send_request(type_traject_bool)
+                #     flag = False
                 params = self.subscription.read()
                 value = params[0].value
                 # trans, euler = value[:3], value[3:]
